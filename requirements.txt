@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+pydub
+jinja2
+aiofiles
+whisper
+torch
+numpy

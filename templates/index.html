@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio-to-Text Converter</title>
+    
+    <!-- Favicon Added Below -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 16 16%22><rect width=%2216%22 height=%2216%22 fill=%22%23222222%22/><text x=%228%22 y=%2212%22 font-size=%2210%22 text-anchor=%22middle%22 fill=%22%23ffffff%22>AT</text></svg>" type="image/svg+xml">
+    
+    <style>
+        /* Reset styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body, html {
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: url('/static/img.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.85); /* Dark background */
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(204, 204, 204, 0.8);
+            text-align: center;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #ffffff; /* White text */
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+        label {
+            font-size: 1rem;
+            color: #dddddd; /* Light gray for labels */
+            text-align: center;
+        }
+        input[type="file"],
+        select,
+        button {
+            width: 100%;
+            max-width: 600px;
+            padding: 12px;
+            font-size: 1rem;
+            border: 1px solid #444444;
+            border-radius: 5px;
+            outline: none;
+            background: #222222; /* Dark input background */
+            color: white; /* White text */
+        }
+        input[type="file"] {
+            cursor: pointer;
+        }
+        input[type="file"]::file-selector-button {
+            background: #444444;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background: #666666;
+        }
+        button {
+            background-color: #1a73e8; /* Dark Blue background */
+            color: white; /* White text */
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #1669c1; /* Slightly lighter dark blue on hover */
+        }
+        select {
+            background: #222222;
+            color: white;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 1rem;
+            text-align: center;
+            color: #dddddd; /* Light gray for results */
+        }
+        #result p {
+            margin-bottom: 10px;
+        }
+        /* Badge Styling for Time Taken */
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #28a745; /* Green background */
+            border-radius: 12px;
+            margin-left: 10px;
+        }
+        /* Flex Container for Buttons */
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 10px;
+            flex-wrap: wrap; /* Allows wrapping on smaller screens */
+        }
+        /* Social Media Buttons Styling */
+        .social-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            color: white;
+            background-color: #333333; /* Dark gray background for consistency */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+        .social-button.twitter {
+            background-color: #1a1f71; /* Dark Blue for Twitter */
+        }
+        .social-button.facebook {
+            background-color: #1a1f71; /* Dark Blue for Facebook */
+        }
+        .social-button.download-button {
+            background-color: #1a73e8; /* Dark Blue matching the Convert button */
+        }
+        .social-button:hover {
+            background-color: #555555; /* Lighter dark background on hover */
+        }
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            .button-group {
+                flex-direction: column;
+            }
+            .social-button {
+                width: 100%;
+            }
+        }
+
+        /* Spinner Styles */
+        .loader {
+            border: 8px solid #f3f3f3; /* Light grey */
+            border-top: 8px solid #1a73e8; /* Blue */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto; /* Center the spinner with some top margin */
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="transcription-container">
+        <h1>Audio-to-Text Converter</h1>
+        <form id="upload-form" enctype="multipart/form-data">
+            <label for="audio">Upload Audio File</label>
+            <input type="file" id="audio" name="file" accept=".wav, .aiff, .aifc, .flac, .mp3, .ogg, .m4a" required>
+            
+            <!-- Language Selection Dropdown -->
+            <label for="language">Select Language</label>
+            <select id="language" name="language">
+                <option value="auto">Auto (Detect Language)</option>
+                <option value="ar">Arabic</option>
+                <option value="bg">Bulgarian</option>
+                <option value="bn">Bengali</option>
+                <option value="ca">Catalan</option>
+                <option value="cs">Czech</option>
+                <option value="da">Danish</option>
+                <option value="de">German</option>
+                <option value="el">Greek</option>
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="et">Estonian</option>
+                <option value="fi">Finnish</option>
+                <option value="fr">French</option>
+                <option value="gu">Gujarati</option>
+                <option value="hi">Hindi</option>
+                <option value="hr">Croatian</option>
+                <option value="hu">Hungarian</option>
+                <option value="id">Indonesian</option>
+                <option value="it">Italian</option>
+                <option value="ja">Japanese</option>
+                <option value="kn">Kannada</option>
+                <option value="ko">Korean</option>
+                <option value="mr">Marathi</option>
+                <option value="ms">Malay</option>
+                <option value="nl">Dutch</option>
+                <option value="no">Norwegian</option>
+                <option value="pl">Polish</option>
+                <option value="pt">Portuguese</option>
+                <option value="ro">Romanian</option>
+                <option value="ru">Russian</option>
+                <option value="sk">Slovak</option>
+                <option value="sl">Slovenian</option>
+                <option value="sv">Swedish</option>
+                <option value="ta">Tamil</option>
+                <option value="te">Telugu</option>
+                <option value="th">Thai</option>
+                <option value="tr">Turkish</option>
+                <option value="uk">Ukrainian</option>
+                <option value="ur">Urdu</option>
+                <option value="vi">Vietnamese</option>
+                <option value="zh">Chinese</option>
+            </select>
+            
+            <button type="submit">Convert</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const resultDiv = document.getElementById('result');
+        const container = document.getElementById('transcription-container');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            // Replace the loading message with the spinner
+            resultDiv.innerHTML = '<div class="loader"></div>';
+            
+            const formData = new FormData(form);
+            try {
+                const response = await fetch('/transcribe/', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const transcription = data.transcription;
+                    const transcriptionTime = data.transcription_time_seconds;
+
+                    // Create a blob from the transcription text
+                    const blob = new Blob([transcription], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Update the result div with transcription and time
+                    resultDiv.innerHTML = `
+                        <p><strong>Transcription:</strong></p>
+                        <p>${transcription}</p>
+                        <p><strong>Time Taken:</strong> <span class="badge">${transcriptionTime} seconds</span></p>
+                        <div class="button-group">
+                            <a href="${url}" download="transcription.txt" class="social-button download-button">Download Transcript</a>
+                            <a href="#" class="social-button twitter" id="share-twitter">Share on Twitter</a>
+                            <a href="#" class="social-button facebook" id="share-facebook">Share on Facebook</a>
+                        </div>
+                    `;
+
+                    // Add event listeners for social media sharing
+                    const shareTwitter = document.getElementById('share-twitter');
+                    const shareFacebook = document.getElementById('share-facebook');
+
+                    // Function to open a new window for sharing
+                    const openShareWindow = (url) => {
+                        window.open(url, '_blank', 'width=600,height=400');
+                    };
+
+                    // Twitter Share
+                    shareTwitter.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        const text = encodeURIComponent(`I just transcribed an audio file! Check it out:`);
+                        const shareUrl = encodeURIComponent(window.location.href);
+                        const twitterUrl = `https://twitter.com/intent/tweet?text=${text}&url=${shareUrl}`;
+                        openShareWindow(twitterUrl);
+                    });
+
+                    // Facebook Share
+                    shareFacebook.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        const shareUrl = encodeURIComponent(window.location.href);
+                        const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
+                        openShareWindow(facebookUrl);
+                    });
+
+                } else {
+                    resultDiv.innerHTML = `<p><strong>Error:</strong> ${data.error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
