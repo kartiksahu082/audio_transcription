@@ -41,26 +41,27 @@ SUPPORTED_INPUT_FORMATS = ["wav", "aiff", "aifc", "flac", "mp3", "ogg", "m4a"]
 # 2. Model Initialization
 # ----------------------------
 
-# Initialize Whisper model as a global variable
-model = None
+# Initialize Whisper models as a global dictionary
+models = {}
+AVAILABLE_MODELS = ["turbo", "base", "small"]  # Define available models
 
 @app.on_event("startup")
-def load_whisper_model():
+def load_whisper_models():
     """
-    Loads the Whisper model at application startup and moves it to GPU if available.
+    Loads all available Whisper models at application startup and moves them to GPU if available.
     """
-    global model
+    global models
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info(f"Loading Whisper models on device: {device}")
     try:
-        model_size = "turbo"  # Options: 'tiny', 'base', 'small', 'medium', 'large'
-        logger.info(f"Loading Whisper model '{model_size}'...")
-        model = whisper.load_model(model_size)
-        if torch.cuda.is_available():
-            model = model.to("cuda")
-            logger.info("Whisper model loaded and moved to CUDA GPU successfully.")
-        else:
-            logger.info("Whisper model loaded on CPU.")
+        for model_size in AVAILABLE_MODELS:
+            logger.info(f"Loading Whisper model '{model_size}'...")
+            loaded_model = whisper.load_model(model_size)
+            loaded_model = loaded_model.to(device)
+            models[model_size] = loaded_model
+            logger.info(f"Whisper model '{model_size}' loaded successfully.")
     except Exception as e:
-        logger.exception(f"Failed to load Whisper model: {e}")
+        logger.exception(f"Failed to load Whisper models: {e}")
         raise e
 
 # ----------------------------
@@ -75,18 +76,20 @@ def normalize_audio(audio_segment):
     change_in_dBFS = target_dBFS - audio_segment.dBFS
     return audio_segment.apply_gain(change_in_dBFS)
 
-def transcribe_with_whisper(audio_path, language="en"):
+def transcribe_with_whisper(audio_path, language="en", model_size="turbo"):
     """
-    Transcribes audio using the Whisper model.
-    Returns the transcription text.
+    Transcribes audio using the specified Whisper model.
+    Returns the transcription text and time taken.
     """
-    if model is None:
-        logger.error("Whisper model is not loaded.")
-        raise RuntimeError("Whisper model is not loaded.")
+    global models
+    if model_size not in models:
+        logger.error(f"Requested model '{model_size}' is not loaded.")
+        raise ValueError(f"Model '{model_size}' is not available.")
 
     try:
+        model = models[model_size]
         device = next(model.parameters()).device
-        logger.info(f"Transcribing on device: {device}")
+        logger.info(f"Transcribing using model '{model_size}' on device: {device}")
 
         # Handle 'auto' language detection
         if language.lower() == "auto":
@@ -137,7 +140,9 @@ async def home(request: Request):
 
 @app.post("/transcribe/", response_class=JSONResponse)
 async def transcribe_audio(request: Request, background_tasks: BackgroundTasks,
-                          file: UploadFile = Form(...), language: str = Form("en")):
+                          file: UploadFile = Form(...), 
+                          language: str = Form("en"),
+                          model: str = Form("turbo")):
     """
     Handles the audio file upload, processing, and transcription using Whisper.
     Returns both the transcription and the time taken for transcription.
@@ -147,6 +152,13 @@ async def transcribe_audio(request: Request, background_tasks: BackgroundTasks,
     if len(content) > MAX_FILE_SIZE:
         logger.warning(f"Uploaded file size {len(content)} exceeds the 50MB limit.")
         raise HTTPException(status_code=400, detail="File size exceeds the 50MB limit.")
+
+    if model not in AVAILABLE_MODELS:
+        logger.warning(f"Unsupported model selection: {model}")
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Unsupported model selection: {model}."}
+        )
 
     try:
         filename = file.filename
@@ -197,7 +209,7 @@ async def transcribe_audio(request: Request, background_tasks: BackgroundTasks,
 
         # Transcribe using Whisper
         try:
-            transcription, transcription_time = transcribe_with_whisper(normalized_path, language=language)
+            transcription, transcription_time = transcribe_with_whisper(normalized_path, language=language, model_size=model)
             logger.info(f"Transcription successful for {normalized_path} in {transcription_time} seconds.")
         except Exception as e:
             logger.error(f"Transcription failed: {e}")
@@ -208,7 +220,8 @@ async def transcribe_audio(request: Request, background_tasks: BackgroundTasks,
 
         return {
             "transcription": transcription,
-            "transcription_time_seconds": transcription_time
+            "transcription_time_seconds": transcription_time,
+            "model_used": model
         }
 
     except HTTPException as he:

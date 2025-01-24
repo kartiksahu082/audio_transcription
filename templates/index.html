@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio-to-Text Converter</title>
     
-    <!-- Favicon Added Below -->
+    <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 16 16%22><rect width=%2216%22 height=%2216%22 fill=%22%23222222%22/><text x=%228%22 y=%2212%22 font-size=%2210%22 text-anchor=%22middle%22 fill=%22%23ffffff%22>AT</text></svg>" type="image/svg+xml">
     
     <style>
@@ -173,6 +173,10 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Removed Modal Styles */
+
+        /* Removed .modal, .modal-content, .close, .model-option, .model-description styles */
     </style>
 </head>
 <body>
@@ -228,6 +232,14 @@
                 <option value="vi">Vietnamese</option>
                 <option value="zh">Chinese</option>
             </select>
+
+            <!-- Model Selection Drop-Down -->
+            <label for="model-select">Select Model</label>
+            <select id="model-select" name="model">
+                <option value="turbo" selected>Turbo</option>
+                <option value="base">Base</option>
+                <option value="small">Small</option>
+            </select>
             
             <button type="submit">Convert</button>
         </form>
@@ -238,7 +250,6 @@
     <script>
         const form = document.getElementById('upload-form');
         const resultDiv = document.getElementById('result');
-        const container = document.getElementById('transcription-container');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -246,6 +257,8 @@
             resultDiv.innerHTML = '<div class="loader"></div>';
             
             const formData = new FormData(form);
+            // The 'model' field is already included via the select dropdown
+            
             try {
                 const response = await fetch('/transcribe/', {
                     method: 'POST',
@@ -256,6 +269,7 @@
                 if (response.ok) {
                     const transcription = data.transcription;
                     const transcriptionTime = data.transcription_time_seconds;
+                    const modelUsed = data.model_used; // Backend sends 'model_used'
 
                     // Create a blob from the transcription text
                     const blob = new Blob([transcription], { type: 'text/plain' });
@@ -266,6 +280,7 @@
                         <p><strong>Transcription:</strong></p>
                         <p>${transcription}</p>
                         <p><strong>Time Taken:</strong> <span class="badge">${transcriptionTime} seconds</span></p>
+                        <p><strong>Model Used:</strong> ${modelUsed.charAt(0).toUpperCase() + modelUsed.slice(1)}</p>
                         <div class="button-group">
                             <a href="${url}" download="transcription.txt" class="social-button download-button">Download Transcript</a>
                             <a href="#" class="social-button twitter" id="share-twitter">Share on Twitter</a>
@@ -285,7 +300,7 @@
                     // Twitter Share
                     shareTwitter.addEventListener('click', (event) => {
                         event.preventDefault();
-                        const text = encodeURIComponent(`I just transcribed an audio file! Check it out:`);
+                        const text = encodeURIComponent(`I just transcribed an audio file using the ${modelUsed.charAt(0).toUpperCase() + modelUsed.slice(1)} model! Check it out:`);
                         const shareUrl = encodeURIComponent(window.location.href);
                         const twitterUrl = `https://twitter.com/intent/tweet?text=${text}&url=${shareUrl}`;
                         openShareWindow(twitterUrl);
